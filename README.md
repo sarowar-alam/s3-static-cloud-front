@@ -1,352 +1,461 @@
-# Static Website with AWS S3, CloudFront, SSL & Route53
+# AWS S3 Static Website Hosting - Complete Guide
 
-Complete setup for hosting a static website on AWS with:
-- **S3 Bucket** (ap-south-1) - Private storage
-- **CloudFront CDN** - Global content delivery with HTTPS
-- **Let's Encrypt SSL** - Free SSL certificate via Certbot
-- **Route53 DNS** - Custom domain routing
+This workspace contains **automated scripts and comprehensive guides** for deploying static websites on AWS using two different approaches:
 
-## 🌐 Project Details
-
-- **Domain**: bmiostad.ostaddevops.click
-- **S3 Bucket**: ostad-devops-batch-10 (ap-south-1)
-- **Hosted Zone**: ostaddevops.click (Z1019653XLWIJ02C53P5)
-- **AWS Profile**: sarowar-ostad
+1. **Public S3 Bucket** - Simple HTTP static website hosting
+2. **Private S3 + CloudFront** - Secure HTTPS hosting with global CDN
 
 ---
 
-## 📋 Prerequisites
+## Table of Contents
 
-### On Ubuntu 24.04 (for Certbot)
-- Ubuntu 24.04 LTS
-- Root or sudo access
-- AWS CLI installed and configured
-
-### AWS Prerequisites
-- AWS Account (ID: 388779989543)
-- AWS CLI configured with profile `sarowar-ostad`
-- IAM user with permissions for:
-  - S3 (bucket creation, policy management)
-  - CloudFront (distribution creation, OAC)
-  - ACM (certificate import)
-  - Route53 (record management, DNS validation)
-  - STS (identity verification)
-
-### Domain Prerequisites
-- Route53 hosted zone: ostaddevops.click
-- Domain must be configured to use Route53 nameservers
+- [Overview](#overview)
+- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
+- [When to Use Which Approach](#when-to-use-which-approach)
+- [Prerequisites](#prerequisites)
+- [Getting Started](#getting-started)
+- [Features Comparison](#features-comparison)
+- [Cost Comparison](#cost-comparison)
+- [Additional Resources](#additional-resources)
 
 ---
 
-## 🚀 Setup Instructions
+## Overview
 
-### Phase 1: SSL Certificate (Ubuntu 24.04)
+This project provides **complete automation and documentation** for deploying static websites on AWS S3 with optional CloudFront CDN integration. Whether you're learning AWS, building a portfolio site, or deploying a production website, these scripts and guides will help you get started quickly.
 
-Run these scripts on **Ubuntu 24.04**:
+### What's Included
 
-#### 1️⃣ Install Certbot
-```bash
-bash 01-install-certbot.sh
-```
-- Installs Certbot and Route53 DNS plugin
-- Verifies installation
-
-#### 2️⃣ Request Certificate
-```bash
-# IMPORTANT: Edit script and update EMAIL variable first!
-bash 02-request-certificate.sh
-```
-- Requests Let's Encrypt certificate for bmiostad.ostaddevops.click
-- Uses Route53 DNS-01 challenge (automatic validation)
-- Certificate stored in `/etc/letsencrypt/live/bmiostad.ostaddevops.click/`
-
-#### 3️⃣ Export Certificate
-```bash
-bash 03-export-certificate.sh
-```
-- Exports certificate files to `./ssl-certs/` directory
-- Files: cert.pem, privkey.pem, chain.pem, fullchain.pem
-
-#### 4️⃣ Import to ACM
-```bash
-bash 04-import-to-acm.sh
-```
-- Imports certificate to AWS ACM in us-east-1 (required for CloudFront)
-- Saves certificate ARN to `certificate-arn.txt`
+- **PowerShell scripts** for Windows
+- **Bash scripts** for Linux/Mac/WSL
+- **Detailed setup guides** with AWS Console instructions
+- **Automated deployment** with configuration validation
+- **Idempotent scripts** - safe to run multiple times
+- **Cleanup instructions** for resource management
+- **Troubleshooting guides** for common issues
 
 ---
 
-### Phase 2: AWS Infrastructure
-
-Run these scripts on **any machine** with AWS CLI configured:
-
-#### 5️⃣ Create S3 Bucket
-```bash
-bash 05-create-s3-bucket.sh
-```
-- Creates private S3 bucket: ostad-devops-batch-10 in ap-south-1
-- Uploads index.html and error.html
-- Enables static website hosting
-- **Bucket remains private** (no public access)
-
-#### 6️⃣ Create CloudFront OAC
-```bash
-bash 06-create-cloudfront-oac.sh
-```
-- Creates Origin Access Control (OAC) for secure S3 access
-- Saves OAC ID to `oac-id.txt`
-
-#### 6️⃣ Create CloudFront Distribution
-```bash
-bash 06-create-cloudfront.sh
-```
-- Creates CloudFront distribution with:
-  - S3 origin (ostad-devops-batch-10)
-  - SSL certificate from ACM
-  - Custom domain (bmiostad.ostaddevops.click)
-  - HTTPS redirect (HTTP → HTTPS)
-  - Custom error page (404 → error.html)
-  - Compression enabled
-  - HTTP/2 and HTTP/3 support
-- Saves distribution ID to `distribution-id.txt`
-- Saves CloudFront domain to `distribution-domain.txt`
-- ⏳ **Takes 5-15 minutes to deploy**
-
-#### 7️⃣ Update S3 Bucket Policy
-```bash
-bash 07-update-bucket-policy.sh
-```
-- Updates bucket policy to allow CloudFront OAC access
-- Bucket remains private to public
-- Only CloudFront distribution can access objects
-
-#### 8️⃣ Create Route53 DNS Record
-```bash
-bash 08-create-route53-record.sh
-```
-- Creates A and AAAA records in Route53
-- Points bmiostad.ostaddevops.click to CloudFront distribution
-- Uses Route53 Alias records (no charge)
-- ⏳ **DNS propagation: 5-60 minutes**
-
----
-
-## ✅ Verification
-
-After DNS propagation (5-60 minutes), test your website:
-
-### Test HTTPS Access
-```bash
-curl -I https://bmiostad.ostaddevops.click
-```
-
-### Test HTTP Redirect
-```bash
-curl -I http://bmiostad.ostaddevops.click
-```
-
-### Test SSL Certificate
-```bash
-openssl s_client -connect bmiostad.ostaddevops.click:443 -servername bmiostad.ostaddevops.click
-```
-
-### Test DNS Resolution
-```bash
-nslookup bmiostad.ostaddevops.click
-dig bmiostad.ostaddevops.click
-```
-
-### Browser Test
-Open in browser: https://bmiostad.ostaddevops.click
-
----
-
-## 🔄 Certificate Renewal
-
-Let's Encrypt certificates **expire every 90 days**.
-
-### Automated Renewal (Every 60-80 Days)
-```bash
-bash 09-renew-certificate.sh
-```
-
-This script:
-1. Renews certificate with Certbot
-2. Exports renewed certificate
-3. Re-imports to ACM (same ARN)
-4. CloudFront automatically uses renewed certificate
-
-### Set Calendar Reminder
-📅 **Set a reminder for 60 days from today** to run the renewal script.
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 static-site/
-├── 01-install-certbot.sh           # Install Certbot on Ubuntu 24
-├── 02-request-certificate.sh       # Request Let's Encrypt certificate
-├── 03-export-certificate.sh        # Export certificate files
-├── 04-import-to-acm.sh            # Import to AWS ACM
-├── 05-create-s3-bucket.sh         # Create private S3 bucket
-├── 06-create-cloudfront-oac.sh    # Create CloudFront OAC
-├── 06-create-cloudfront.sh        # Create CloudFront distribution
-├── 07-update-bucket-policy.sh     # Update S3 bucket policy
-├── 08-create-route53-record.sh    # Create Route53 DNS record
-├── 09-renew-certificate.sh        # Renew certificate (run every 60 days)
-├── create-bucket.sh               # Updated S3 bucket script
-├── index.html                     # Website homepage
-├── error.html                     # 404 error page
-├── README.md                      # This file
-└── .gitignore                     # Git ignore rules
-```
-
-### Generated Files (Not in Git)
-```
-ssl-certs/                         # Certificate files (sensitive)
-├── cert.pem
-├── privkey.pem
-├── chain.pem
-└── fullchain.pem
-certificate-arn.txt               # ACM certificate ARN
-oac-id.txt                       # CloudFront OAC ID
-distribution-id.txt              # CloudFront distribution ID
-distribution-domain.txt          # CloudFront domain name
-cloudfront-config.json           # CloudFront configuration
-bucket-policy.json               # S3 bucket policy
-route53-change.json              # Route53 change batch
-policy.json                      # Old bucket policy (legacy)
+|-- README.md                          # This file - main documentation
+|-- index.html                         # Your website homepage
+|-- error.html                         # Custom 404 error page
+|
+|-- s3-static-website-setup/           # Simple public S3 hosting
+|   |-- README.md                      # Detailed guide for public S3
+|   |-- setup-s3-static-website.ps1    # PowerShell automation script
+|   |-- setup-s3-static-website.sh     # Bash automation script
+|   `-- bucket-policy.json             # S3 bucket policy template
+|
+`-- s3-cloudfront-setup/               # Secure CloudFront + S3 hosting
+    |-- README.md                      # Detailed guide for CloudFront
+    |-- setup-cloudfront-website.ps1   # PowerShell automation script
+    `-- setup-cloudfront-website.sh    # Bash automation script
 ```
 
 ---
 
-## 🔒 Security Best Practices
+## Quick Start
 
-1. **Private S3 Bucket**: Only accessible via CloudFront OAC
-2. **HTTPS Only**: HTTP requests automatically redirect to HTTPS
-3. **TLS 1.2+**: Minimum TLS version enforced
-4. **No Public Access**: S3 Block Public Access enabled
-5. **Least Privilege**: Bucket policy allows only specific CloudFront distribution
+### Option 1: Public S3 (HTTP Only) - Simplest Setup
 
----
+**Best for**: Learning, development, temporary demos
 
-## 🔧 Updating Website Content
+```powershell
+# Windows
+cd s3-static-website-setup
+.\setup-s3-static-website.ps1
+```
 
-### Upload New Files
 ```bash
-aws s3 cp newfile.html s3://ostad-devops-batch-10/ \
-  --content-type "text/html; charset=utf-8" \
-  --profile sarowar-ostad
+# Linux/Mac
+cd s3-static-website-setup
+chmod +x setup-s3-static-website.sh
+./setup-s3-static-website.sh
 ```
 
-### Invalidate CloudFront Cache
+**Result**: Website accessible at `http://your-bucket.s3-website.region.amazonaws.com`
+
+ **[See detailed guide ](s3-static-website-setup/README.md)**
+
+---
+
+### Option 2: CloudFront + S3 (HTTPS) - Production Ready
+
+**Best for**: Production websites, portfolios, business sites
+
+```powershell
+# Windows
+cd s3-cloudfront-setup
+.\setup-cloudfront-website.ps1
+```
+
 ```bash
-aws cloudfront create-invalidation \
-  --distribution-id $(cat distribution-id.txt) \
-  --paths "/*" \
-  --profile sarowar-ostad
+# Linux/Mac
+cd s3-cloudfront-setup
+chmod +x setup-cloudfront-website.sh
+./setup-cloudfront-website.sh
 ```
+
+**Result**: Website accessible at `https://d1234567890abc.cloudfront.net`
+
+ **[See detailed guide ](s3-cloudfront-setup/README.md)**
 
 ---
 
-## 📊 Monitoring & Management
+## When to Use Which Approach
 
-### Check CloudFront Distribution Status
+### Use **Public S3** When:
+
+- Learning AWS S3 basics
+- Building a development/test website
+- Creating temporary demos or prototypes
+- Cost is primary concern (lowest cost)
+- HTTPS is not required
+- Performance for one region is sufficient
+- Simple setup is preferred
+
+**Limitations**:
+- HTTP only (no HTTPS)
+- No CDN (slower for global users)
+- No custom domain SSL support
+- Bucket must be publicly readable
+
+---
+
+### Use **CloudFront + S3** When:
+
+- Deploying production websites
+- HTTPS/SSL is required
+- Global audience (faster worldwide)
+- Custom domain with SSL needed
+- Private S3 bucket preferred (security)
+- CDN caching benefits needed
+- Professional portfolio or business site
+
+**Benefits**:
+- HTTPS with free AWS SSL certificate
+- Global CDN (450+ edge locations)
+- Private S3 bucket (more secure)
+- Better performance worldwide
+- Custom domain support
+- DDoS protection included
+
+---
+
+## Prerequisites
+
+### Required for Both Approaches
+
+1. **AWS Account**
+   - Sign up at [aws.amazon.com](https://aws.amazon.com)
+   - Credit card required (free tier available)
+
+2. **AWS CLI Installed**
+   - Download: [AWS CLI Installation Guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+   - Verify: `aws --version`
+
+3. **AWS CLI Configured**
+   ```bash
+   aws configure --profile your-profile-name
+   ```
+   You'll need:
+   - AWS Access Key ID
+   - AWS Secret Access Key
+   - Default region (e.g., `ap-south-1`)
+   - Output format (e.g., `json`)
+
+4. **Website Files**
+   - `index.html` - Your homepage (required)
+   - `error.html` - Custom 404 page (optional)
+
+### Additional for Bash Scripts
+
+5. **jq JSON Processor** (CloudFront script only)
+   ```bash
+   # Ubuntu/Debian
+   sudo apt install jq
+   
+   # RHEL/CentOS
+   sudo yum install jq
+   
+   # macOS
+   brew install jq
+   ```
+
+### AWS IAM Permissions Required
+
+Your AWS user/role needs these permissions:
+
+**For Public S3:**
+- `s3:CreateBucket`
+- `s3:PutObject`
+- `s3:PutBucketPolicy`
+- `s3:PutBucketWebsite`
+- `s3:PutPublicAccessBlock`
+
+**For CloudFront + S3 (additional):**
+- `cloudfront:CreateDistribution`
+- `cloudfront:CreateOriginAccessControl`
+- `cloudfront:GetDistribution`
+- `cloudfront:ListDistributions`
+- `sts:GetCallerIdentity`
+
+---
+
+## Getting Started
+
+### Step 1: Prepare Your Website Files
+
+1. Create or edit `index.html` in this directory
+2. Create or edit `error.html` in this directory (optional)
+
+**Example index.html:**
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Static Website</title>
+</head>
+<body>
+    <h1>Welcome to My Website!</h1>
+    <p>This website is hosted on AWS S3.</p>
+</body>
+</html>
+```
+
+### Step 2: Configure AWS CLI
+
 ```bash
-aws cloudfront get-distribution \
-  --id $(cat distribution-id.txt) \
-  --profile sarowar-ostad \
-  --query 'Distribution.Status'
+# Configure with named profile
+aws configure --profile my-aws-profile
+
+# Test configuration
+aws s3 ls --profile my-aws-profile
 ```
 
-### Check Certificate Expiry
+### Step 3: Choose Your Approach
+
+- **Learning/Development?**  Go to [s3-static-website-setup](s3-static-website-setup/)
+- **Production/Portfolio?**  Go to [s3-cloudfront-setup](s3-cloudfront-setup/)
+
+### Step 4: Edit Script Configuration
+
+Open the script file and modify these variables:
+
+```powershell
+# PowerShell
+$BUCKET_NAME = "your-unique-bucket-name"
+$AWS_REGION = "ap-south-1"
+$AWS_PROFILE = "your-profile-name"
+```
+
 ```bash
-aws acm describe-certificate \
-  --certificate-arn $(cat certificate-arn.txt) \
-  --region us-east-1 \
-  --profile sarowar-ostad \
-  --query 'Certificate.NotAfter'
+# Bash
+BUCKET_NAME="your-unique-bucket-name"
+AWS_REGION="ap-south-1"
+AWS_PROFILE="your-profile-name"
 ```
 
-### List CloudFront Distributions
+### Step 5: Run the Script
+
+Follow the instructions in each folder's README.md file.
+
+---
+
+## Features Comparison
+
+| Feature | Public S3 | CloudFront + S3 |
+|---------|-----------|-----------------|
+| **Setup Complexity** | Simple | Moderate |
+| **Setup Time** | 1-2 minutes | 15-20 minutes* |
+| **Protocol** | HTTP | HTTPS (+ HTTP redirect) |
+| **Security** | Public bucket | Private bucket + OAC |
+| **SSL/TLS** | Not available | Free AWS certificate |
+| **Custom Domain** | Limited | Full support |
+| **Global CDN** | Single region | 450+ edge locations |
+| **Caching** | No CDN cache | Edge caching |
+| **DDoS Protection** | Basic | AWS Shield Standard |
+| **Access Control** | Public only | Private with OAC |
+| **Cost** | Lowest | Higher (CDN costs) |
+| **Best For** | Development, learning | Production, portfolios |
+
+\* *Includes CloudFront deployment time*
+
+---
+
+## Cost Comparison
+
+### Public S3 Hosting (ap-south-1 region)
+
+**Monthly costs for a small website (100 MB, 10,000 visitors):**
+- S3 Storage: 0.1 GB  $0.023 = **$0.002**
+- S3 Requests: 10,000 GET  $0.004/10k = **$0.004**
+- Data Transfer: 1 GB out  $0.109 = **$0.109**
+- **Total**: ~**$0.12/month**
+
+**Free Tier (first 12 months):**
+- 5 GB storage
+- 20,000 GET requests
+- 2,000 PUT requests
+- 1 GB data transfer out
+
+---
+
+### CloudFront + S3 Hosting (ap-south-1 region)
+
+**Monthly costs for same website:**
+- S3 Storage: 0.1 GB  $0.023 = **$0.002**
+- CloudFront Data Transfer: 1 GB  $0.085 = **$0.085**
+- CloudFront Requests: 10k  $0.0075/10k = **$0.0075**
+- **Total**: ~**$0.10/month**
+
+**Free Tier (first 12 months):**
+- 1 TB CloudFront data transfer out
+- 10 million HTTP/HTTPS requests
+- 5 GB S3 storage
+
+**Note**: CloudFront can be cheaper for high-traffic sites due to lower data transfer rates.
+
+---
+
+## Additional Resources
+
+### AWS Documentation
+
+- [Amazon S3 Documentation](https://docs.aws.amazon.com/s3/)
+- [Amazon CloudFront Documentation](https://docs.aws.amazon.com/cloudfront/)
+- [AWS CLI Command Reference](https://docs.aws.amazon.com/cli/)
+- [AWS Free Tier Details](https://aws.amazon.com/free/)
+
+### Tutorials & Guides
+
+- [Hosting a Static Website on S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/WebsiteHosting.html)
+- [CloudFront + S3 Tutorial](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/GettingStarted.SimpleDistribution.html)
+- [Using Custom Domains with Route 53](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-to-cloudfront-distribution.html)
+
+### AWS CLI Installation
+
+- [Windows](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-windows.html)
+- [macOS](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-mac.html)
+- [Linux](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-linux.html)
+
+---
+
+## Customization & Extension
+
+### Adding More Files
+
+Both scripts upload `index.html` and `error.html` by default. To add more files:
+
+**Manually via AWS CLI:**
 ```bash
-aws cloudfront list-distributions \
-  --profile sarowar-ostad \
-  --query 'DistributionList.Items[*].[Id,DomainName,Status]' \
-  --output table
+aws s3 cp style.css s3://your-bucket/ \
+  --content-type "text/css" \
+  --profile your-profile
 ```
 
----
+**Sync entire directory:**
+```bash
+aws s3 sync ./website-folder s3://your-bucket/ \
+  --profile your-profile
+```
 
-## ⚠️ Important Notes
+### Adding Custom Domain
 
-1. **Certificate Region**: ACM certificates for CloudFront **must** be in us-east-1
-2. **S3 Region**: Bucket can be in any region (we use ap-south-1)
-3. **Certificate Expiry**: Let's Encrypt certificates expire in 90 days
-4. **Renewal Process**: Must renew and re-import certificate before expiry
-5. **DNS Propagation**: Can take 5-60 minutes globally
-6. **CloudFront Deployment**: Takes 5-15 minutes for changes to propagate
-7. **Sensitive Files**: Never commit `ssl-certs/` or `privkey.pem` to version control
+1. Register domain in Route 53 (or use existing domain)
+2. Request SSL certificate in AWS Certificate Manager (us-east-1 for CloudFront)
+3. Add CNAME to CloudFront distribution
+4. Configure Route 53 to point to CloudFront
 
----
-
-## 🆘 Troubleshooting
-
-### Certificate Request Fails
-- Verify AWS credentials are configured
-- Check Route53 hosted zone exists and is accessible
-- Ensure IAM user has Route53 permissions
-
-### CloudFront Distribution Creation Fails
-- Verify certificate ARN is in us-east-1
-- Check OAC ID is correct
-- Ensure domain matches certificate
-
-### Website Not Accessible
-- Wait for CloudFront deployment (5-15 minutes)
-- Wait for DNS propagation (5-60 minutes)
-- Verify Route53 record created correctly
-- Check bucket policy allows CloudFront access
-
-### SSL Certificate Invalid
-- Verify certificate imported to us-east-1
-- Check CloudFront using correct certificate ARN
-- Wait for CloudFront deployment to complete
+See [CloudFront README](s3-cloudfront-setup/README.md) for details.
 
 ---
 
-## 💰 Cost Estimate
+## Troubleshooting
 
-- **S3 Storage**: ~$0.023/GB/month
-- **CloudFront**: First 1TB free/month, then $0.085/GB
-- **Route53 Hosted Zone**: $0.50/month
-- **ACM Certificate**: **FREE** (imported certificates)
-- **Let's Encrypt**: **FREE**
+### Common Issues
 
-**Total Estimated Monthly Cost**: < $5 for low-traffic sites
+**Script errors "bucket already exists"**
+- Both scripts handle this gracefully and continue with existing bucket
+- Scripts are idempotent - safe to run multiple times
 
----
+**403 Forbidden errors**
+- For Public S3: Check bucket policy and public access settings
+- For CloudFront: Check OAC configuration and bucket policy
 
-## 📚 Resources
+**Website not updating**
+- For Public S3: Changes reflect immediately in S3
+- For CloudFront: Create cache invalidation after updates
 
-- [AWS S3 Documentation](https://docs.aws.amazon.com/s3/)
-- [AWS CloudFront Documentation](https://docs.aws.amazon.com/cloudfront/)
-- [AWS ACM Documentation](https://docs.aws.amazon.com/acm/)
-- [AWS Route53 Documentation](https://docs.aws.amazon.com/route53/)
-- [Let's Encrypt Documentation](https://letsencrypt.org/docs/)
-- [Certbot Documentation](https://certbot.eff.org/docs/)
+**AWS credentials errors**
+- Run `aws configure --profile your-profile` to reconfigure
+- Verify profile name matches script configuration
 
----
-
-## 📝 License
-
-This project setup is for educational purposes as part of Ostad DevOps Batch-08.
+For detailed troubleshooting, see:
+- [Public S3 Troubleshooting](s3-static-website-setup/README.md#common-issues--solutions)
+- [CloudFront Troubleshooting](s3-cloudfront-setup/README.md#troubleshooting)
 
 ---
 
-## 👨‍💻 Author
+## Support & Community
 
-**Ostad DevOps Batch-08 - Module 01 - Class 02**
+- **AWS Support**: [AWS Support Center](https://console.aws.amazon.com/support/)
+- **AWS Forums**: [AWS Discussion Forums](https://forums.aws.amazon.com/)
+- **AWS re:Post**: [Community Q&A](https://repost.aws/)
+- **Stack Overflow**: Tag questions with `amazon-s3` and `amazon-cloudfront`
 
-For questions or issues, contact your instructor or refer to AWS documentation.
+---
+
+## Learning Path
+
+### Beginner (Start Here)
+1. Read this README
+2. Follow [Public S3 Setup](s3-static-website-setup/README.md)
+3. Deploy a simple website
+4. Understand S3 bucket policies
+
+### Intermediate
+1. Follow [CloudFront Setup](s3-cloudfront-setup/README.md)
+2. Understand Origin Access Control
+3. Learn about CDN caching
+4. Practice cache invalidation
+
+### Advanced
+1. Add custom domain with Route 53
+2. Set up SSL certificate with ACM
+3. Configure Lambda@Edge functions
+4. Implement CI/CD pipeline for deployments
+
+---
+
+## Updates & Maintenance
+
+**Script Version**: 1.0  
+**Last Updated**: February 2026  
+**AWS CLI Version**: 2.x  
+**Tested Regions**: ap-south-1 (Mumbai)
+
+---
+
+**Ready to deploy?** Choose your approach:
+- [Simple Public S3](s3-static-website-setup/)
+- [Secure CloudFront + S3](s3-cloudfront-setup/)
+
+**Happy deploying!**
+
+---
+
+## Author
+*Md. Sarowar Alam*  
+Lead DevOps Engineer, Hogarth Worldwide  
+Email: sarowar@hotmail.com  
+LinkedIn: [linkedin.com/in/sarowar](https://www.linkedin.com/in/sarowar/)
+
+---
