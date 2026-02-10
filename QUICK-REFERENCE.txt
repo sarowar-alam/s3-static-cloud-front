@@ -1,0 +1,187 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║            AWS Static Website Setup - Quick Reference                      ║
+║            Domain: bmiostad.ostaddevops.click                              ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ EXECUTION ORDER - Run scripts in this exact order                         │
+└────────────────────────────────────────────────────────────────────────────┘
+
+📍 BEFORE YOU START:
+   • View full setup guide:  bash SETUP-GUIDE.sh
+   • Check current status:   bash 00-check-status.sh
+   • Read documentation:     cat README.md
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 1: SSL CERTIFICATE (Ubuntu 24.04 Required)                          │
+└────────────────────────────────────────────────────────────────────────────┘
+
+1️⃣  bash 01-install-certbot.sh
+    → Installs Certbot with Route53 plugin
+
+2️⃣  bash 02-request-certificate.sh
+    → Requests Let's Encrypt SSL certificate
+    ⚠️  UPDATE EMAIL IN SCRIPT FIRST!
+
+3️⃣  bash 03-export-certificate.sh
+    → Exports certificate files to ./ssl-certs/
+
+4️⃣  bash 04-import-to-acm.sh
+    → Imports certificate to AWS ACM (us-east-1)
+    ✅ Creates: certificate-arn.txt
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 2: AWS INFRASTRUCTURE (Any machine with AWS CLI)                    │
+└────────────────────────────────────────────────────────────────────────────┘
+
+5️⃣  bash 05-create-s3-bucket.sh
+    → Creates private S3 bucket in ap-south-1
+    → Uploads index.html and error.html
+
+6️⃣  bash 06-create-cloudfront-oac.sh
+    → Creates CloudFront Origin Access Control
+    ✅ Creates: oac-id.txt
+
+7️⃣  bash 06-create-cloudfront.sh
+    → Creates CloudFront distribution
+    ⏳ Takes 5-15 minutes to deploy
+    ✅ Creates: distribution-id.txt, distribution-domain.txt
+
+8️⃣  bash 07-update-bucket-policy.sh
+    → Updates S3 bucket policy for CloudFront access
+
+9️⃣  bash 08-create-route53-record.sh
+    → Creates Route53 A and AAAA records
+    ⏳ DNS propagation: 5-60 minutes
+    🎉 SETUP COMPLETE!
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ MAINTENANCE                                                                │
+└────────────────────────────────────────────────────────────────────────────┘
+
+🔄 bash 09-renew-certificate.sh
+   → Renew SSL certificate (every 60-80 days)
+   📅 Set calendar reminder!
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ VERIFICATION COMMANDS                                                      │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Test website:
+  curl -I https://bmiostad.ostaddevops.click
+
+Test SSL:
+  openssl s_client -connect bmiostad.ostaddevops.click:443
+
+Check DNS:
+  nslookup bmiostad.ostaddevops.click
+
+Check CloudFront status:
+  aws cloudfront get-distribution --id $(cat distribution-id.txt) \
+    --profile sarowar-ostad --query 'Distribution.Status'
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ UPDATE WEBSITE CONTENT                                                     │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Upload new file:
+  aws s3 cp newfile.html s3://ostad-devops-batch-10/ \
+    --content-type "text/html; charset=utf-8" \
+    --profile sarowar-ostad
+
+Invalidate CloudFront cache:
+  aws cloudfront create-invalidation \
+    --distribution-id $(cat distribution-id.txt) \
+    --paths "/*" --profile sarowar-ostad
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ FILE STRUCTURE                                                             │
+└────────────────────────────────────────────────────────────────────────────┘
+
+📜 Setup Scripts (run in order):
+   00-check-status.sh ............... Check setup progress
+   01-install-certbot.sh ............ Install Certbot
+   02-request-certificate.sh ........ Request SSL certificate
+   03-export-certificate.sh ......... Export certificate files
+   04-import-to-acm.sh .............. Import to AWS ACM
+   05-create-s3-bucket.sh ........... Create S3 bucket
+   06-create-cloudfront-oac.sh ...... Create CloudFront OAC
+   06-create-cloudfront.sh .......... Create CloudFront distribution
+   07-update-bucket-policy.sh ....... Update bucket policy
+   08-create-route53-record.sh ...... Create DNS records
+   09-renew-certificate.sh .......... Renew SSL certificate
+
+📄 Website Files:
+   index.html ....................... Homepage
+   error.html ....................... 404 error page
+
+📘 Documentation:
+   README.md ........................ Complete documentation
+   SETUP-GUIDE.sh ................... Interactive setup guide
+   QUICK-REFERENCE.txt .............. This file
+
+🔒 Security:
+   .gitignore ....................... Protects sensitive files
+
+📦 Legacy:
+   create-bucket.sh ................. Updated version (old script)
+   policy.json ...................... Legacy policy file
+
+🔐 Generated Files (sensitive - not in git):
+   ssl-certs/ ....................... Certificate files
+   certificate-arn.txt .............. ACM certificate ARN
+   oac-id.txt ....................... CloudFront OAC ID
+   distribution-id.txt .............. CloudFront distribution ID
+   distribution-domain.txt .......... CloudFront domain
+   cloudfront-config.json ........... CloudFront configuration
+   bucket-policy.json ............... S3 bucket policy
+   route53-change.json .............. Route53 change batch
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ CONFIGURATION                                                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Domain:           bmiostad.ostaddevops.click
+Hosted Zone:      ostaddevops.click (Z1019653XLWIJ02C53P5)
+S3 Bucket:        ostad-devops-batch-10
+S3 Region:        ap-south-1
+ACM Region:       us-east-1 (required for CloudFront)
+AWS Profile:      sarowar-ostad
+AWS Account:      388779989543
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ IMPORTANT REMINDERS                                                        │
+└────────────────────────────────────────────────────────────────────────────┘
+
+⚠️  SSL certificates expire every 90 days
+    Set calendar reminder to renew in 60 days
+
+⚠️  Never commit ssl-certs/ directory to version control
+
+⚠️  ACM certificates for CloudFront MUST be in us-east-1
+
+⚠️  Wait for CloudFront deployment (5-15 min) before testing
+
+⚠️  Wait for DNS propagation (5-60 min) after Route53 setup
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ COST ESTIMATE                                                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+S3 Storage:        ~$0.023/GB/month
+CloudFront:        First 1TB free, then $0.085/GB
+Route53 Zone:      $0.50/month
+ACM Certificate:   FREE (imported certificates)
+Let's Encrypt:     FREE
+
+Total (low traffic): < $5/month
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ SUPPORT                                                                    │
+└────────────────────────────────────────────────────────────────────────────┘
+
+For detailed instructions: cat README.md
+For step-by-step guide:    bash SETUP-GUIDE.sh
+To check progress:         bash 00-check-status.sh
+
+Ostad DevOps Batch-08 | Module 01 | Class 02
